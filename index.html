@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ガチャシミュレーター with API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        .card {
+            display: inline-block;
+            margin: 10px;
+            text-align: center;
+            background-color: #f5f5dc;
+            border: 2px solid #d4af37;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 120px;
+            padding: 10px;
+        }
+        .card img {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border: 2px solid #ccc;
+        }
+        .card p {
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+            margin: 8px 0 0 0;
+        }
+        #pokedex, #shinyPokedex {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            padding: 10px;
+            background: linear-gradient(135deg, #d8f3dc, #95d5b2);
+            border-radius: 15px;
+            box-shadow: inset 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin: 20px;
+        }
+        #rates {
+            margin: 20px;
+            padding: 20px;
+            border: 2px solid #4CAF50;
+            border-radius: 10px;
+            background-color: #f9f9f9;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            display: inline-block;
+            text-align: left;
+        }
+        #rates h3 {
+            margin-top: 0;
+            color: #4CAF50;
+        }
+        #rates p {
+            margin: 5px 0;
+            font-size: 16px;
+        }
+        #completionStats {
+            margin: 20px;
+            padding: 20px;
+            border: 2px solid #2196F3;
+            border-radius: 10px;
+            background-color: #f1faff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            display: inline-block;
+            text-align: left;
+        }
+        #completionStats h3 {
+            margin-top: 0;
+            color: #2196F3;
+        }
+        #completionStats p {
+            margin: 5px 0;
+            font-size: 16px;
+        }
+        h1 {
+            font-size: 40px;
+            color: #ffcc00; /* ポケモンの黄色を意識 */
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+            margin-top: 20px;
+            animation: titleAnimation 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes titleAnimation {
+        0% {
+           transform: scale(1);
+           color: #ffcc00;
+        }
+        50% {
+            transform: scale(1.1);
+            color: #ff6600;
+        }
+        100% {
+            transform: scale(1);
+            color: #ffcc00;
+        }
+        }
+        button {
+            background-color: #4CAF50; /* Green */
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 12px;
+            box-shadow: 0 4px #999;
+        }
+        button:disabled {
+            background-color: #ccc;
+            color: #666;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        button:hover:not(:disabled) {
+            background-color: #45a049;
+        }
+        button:active:not(:disabled) {
+            box-shadow: 0 2px #666;
+            transform: translateY(2px);
+        }
+        #result {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            padding: 20px;
+            background: radial-gradient(circle, #ffe066, #ff6f69);
+            border: 2px solid #f39c12;
+            border-radius: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            animation: spinEffect 1s ease-in-out;
+        }
+        @keyframes spinEffect {
+            0% {
+                transform: rotate(0deg) scale(0.8);
+            }
+            50% {
+                transform: rotate(180deg) scale(1.1);
+            }
+            100% {
+                transform: rotate(360deg) scale(1);
+            }
+        }
+        .card img {
+            animation: pulseEffect 1s ease-in-out;
+        }
+        @keyframes pulseEffect {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.2);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>ポケモンガチャシミュレーター</h1>
+    <button id="singleGacha" disabled>単発ガチャ</button>
+    <button id="multiGacha" disabled>10連ガチャ</button>
+    <button id="resetPokedex">図鑑リセット</button>
+    <p id="gachaCount">ガチャ回数: 0</p>
+
+    <div id="rates">
+        <h3>排出率</h3>
+        <p>通常ポケモン: <span id="normalRate">-</span>%</p>
+        <p>伝説ポケモン: <span id="legendaryRate">-</span>%</p>
+        <p>幻のポケモン: <span id="mythicalRate">-</span>%</p>
+        <p>色違いポケモン: <span id="shinyRate">-</span>%</p>
+    </div>
+
+    <div id="completionStats">
+        <h3>図鑑完成度</h3>
+        <p>図鑑完成度: <span id="completionRate">0 / 0</span></p>
+        <p>コンプリート率: <span id="completionPercentage">0%</span></p>
+        <p>色違い図鑑完成度: <span id="shinyCompletionRate">0 / 0</span></p>
+        <p>色違いコンプリート率: <span id="shinyCompletionPercentage">0%</span></p>
+    </div>
+
+    <div id="result"></div>
+    <h2>図鑑</h2>
+    <div id="pokedex"></div>
+    <h2>色違い図鑑</h2>
+    <div id="shinyPokedex"></div>
+
+    <script>
+        // 全ポケモンデータを保存する配列
+        const allCards = [];
+        let obtainedCards = []; // 取得済みのカードIDを保存
+        let shinyObtainedCards = []; // 取得済みの色違いカードIDを保存
+        let gachaCount = 0; // ガチャ回数をカウント
+        let dataLoaded = false; // データロード完了フラグ
+
+        // ローカルストレージにデータを保存
+        function saveToLocalStorage() {
+            localStorage.setItem("obtainedCards", JSON.stringify(obtainedCards));
+            localStorage.setItem("shinyObtainedCards", JSON.stringify(shinyObtainedCards));
+            localStorage.setItem("gachaCount", gachaCount.toString());
+        }
+
+        // ローカルストレージからデータを読み込み
+        function loadFromLocalStorage() {
+            const storedCards = localStorage.getItem("obtainedCards");
+            const storedShinyCards = localStorage.getItem("shinyObtainedCards");
+            const storedGachaCount = localStorage.getItem("gachaCount");
+            if (storedCards) {
+                obtainedCards = JSON.parse(storedCards);
+            }
+            if (storedShinyCards) {
+                shinyObtainedCards = JSON.parse(storedShinyCards);
+            }
+            if (storedGachaCount) {
+                gachaCount = parseInt(storedGachaCount, 10);
+            }
+            document.getElementById("gachaCount").textContent = `ガチャ回数: ${gachaCount}`;
+        }
+
+        // APIからポケモンデータを取得
+        async function fetchPokemonData() {
+            try {
+                for (let i = 1; i <= 1010; i++) { // 初代ポケモンのみ取得
+                    const speciesResponse = await fetch(`https://pokeapi.co/api/v2/pokemon-species/${i}`);
+                    const pokemonResponse = await fetch(`https://pokeapi.co/api/v2/pokemon/${i}`);
+
+                    if (!speciesResponse.ok || !pokemonResponse.ok) {
+                        throw new Error(`Failed to fetch Pokémon data for ID ${i}`);
+                    }
+
+                    const speciesData = await speciesResponse.json();
+                    const pokemonData = await pokemonResponse.json();
+
+                    const nameInJapanese = speciesData.names.find(name => name.language.name === "ja-Hrkt").name;
+
+                    allCards.push({
+                        id: pokemonData.id,
+                        name: nameInJapanese,
+                        image: pokemonData.sprites.front_default || 'https://via.placeholder.com/100',
+                        shinyImage: pokemonData.sprites.front_shiny || 'https://via.placeholder.com/100/FFCC00?text=Shiny',
+                        isLegendary: speciesData.is_legendary,
+                        isMythical: speciesData.is_mythical
+                    });
+                }
+
+                dataLoaded = true; // データロード完了
+                console.log("全ポケモンデータがロードされました", allCards);
+                enableGachaButtons(); // データロード完了後にガチャボタンを有効化
+                displayRates(); // 排出率を表示
+                displayCompletionStats(); // 完成度を表示
+                displayPokedex(); // 図鑑表示を更新
+                displayShinyPokedex(); // 色違い図鑑表示を更新
+            } catch (error) {
+                console.error("ポケモンデータの取得中にエラーが発生しました:", error);
+                alert("ポケモンデータを取得できませんでした。再読み込みしてください。");
+            }
+        }
+
+        // 排出率を表示する関数
+        function displayRates() {
+            const totalNormal = allCards.filter(card => !card.isLegendary && !card.isMythical).length;
+            const totalLegendary = allCards.filter(card => card.isLegendary).length;
+            const totalMythical = allCards.filter(card => card.isMythical).length;
+
+            const normalRate = ((totalNormal / allCards.length) * 100).toFixed(2);
+            const legendaryRate = ((totalLegendary / allCards.length) * 100).toFixed(2);
+            const mythicalRate = ((totalMythical / allCards.length) * 100).toFixed(2);
+            const shinyRate = ((1 / 4096) * 100).toFixed(5); // 原作と同じ確率
+
+            document.getElementById("normalRate").textContent = normalRate;
+            document.getElementById("legendaryRate").textContent = legendaryRate;
+            document.getElementById("mythicalRate").textContent = mythicalRate;
+            document.getElementById("shinyRate").textContent = shinyRate;
+        }
+
+        // 完成度を表示する関数
+        function displayCompletionStats() {
+            const completionRate = `${obtainedCards.length} / ${allCards.length}`;
+            const completionPercentage = ((obtainedCards.length / allCards.length) * 100).toFixed(2);
+            const shinyCompletionRate = `${shinyObtainedCards.length} / ${allCards.length}`;
+            const shinyCompletionPercentage = ((shinyObtainedCards.length / allCards.length) * 100).toFixed(2);
+
+            document.getElementById("completionRate").textContent = completionRate;
+            document.getElementById("completionPercentage").textContent = `${completionPercentage}%`;
+            document.getElementById("shinyCompletionRate").textContent = shinyCompletionRate;
+            document.getElementById("shinyCompletionPercentage").textContent = `${shinyCompletionPercentage}%`;
+        }
+
+        // ガチャボタンを有効化する関数
+        function enableGachaButtons() {
+            document.getElementById("singleGacha").disabled = false;
+            document.getElementById("multiGacha").disabled = false;
+        }
+
+        // 図鑑を表示する関数
+        function displayPokedex() {
+            const pokedexDiv = document.getElementById("pokedex");
+            pokedexDiv.innerHTML = allCards.map(card => {
+                const isObtained = obtainedCards.includes(card.id);
+                return `
+                    <div class="card">
+                        <img src="${isObtained ? card.image : 'https://via.placeholder.com/100/CCCCCC?text=???'}" alt="${isObtained ? card.name : '???'}">
+                        <p>${isObtained ? card.name : '???'}</p>
+                    </div>
+                `;
+            }).join("");
+        }
+
+        // 色違い図鑑を表示する関数
+        function displayShinyPokedex() {
+            const shinyPokedexDiv = document.getElementById("shinyPokedex");
+            shinyPokedexDiv.innerHTML = allCards.map(card => {
+                const isObtained = shinyObtainedCards.includes(card.id);
+                return `
+                    <div class="card">
+                        <img src="${isObtained ? card.shinyImage : 'https://via.placeholder.com/100/CCCCCC?text=???'}" alt="${isObtained ? card.name : '???'}">
+                        <p>${isObtained ? `⭐${card.name}` : '???'}</p>
+                    </div>
+                `;
+            }).join("");
+        }
+
+        // カードを取得済みリストに追加する関数
+        function addToObtainedCards(card, isShiny) {
+            if (!obtainedCards.includes(card.id)) {
+                obtainedCards.push(card.id);
+            }
+            if (isShiny && !shinyObtainedCards.includes(card.id)) {
+                shinyObtainedCards.push(card.id);
+            }
+            displayPokedex(); // 図鑑を更新
+            displayShinyPokedex(); // 色違い図鑑を更新
+            displayCompletionStats(); // 完成度を更新
+            saveToLocalStorage();
+        }
+
+        // ガチャを引く処理
+        function pullGacha(times) {
+            if (!dataLoaded || allCards.length === 0) {
+                alert("ポケモンデータをロード中です。少々お待ちください。");
+                return;
+            }
+
+            const resultDiv = document.getElementById("result");
+            resultDiv.innerHTML = ""; // 結果表示をリセット
+            for (let i = 0; i < times; i++) {
+                const randomCard = allCards[Math.floor(Math.random() * allCards.length)];
+
+                // 色違い判定 (1/4096 の確率)
+                const isShiny = Math.random() < (1 / 4096);
+                const imageUrl = isShiny ? randomCard.shinyImage : randomCard.image;
+                const name = isShiny ? `⭐${randomCard.name} (色違い)` : randomCard.name;
+
+                resultDiv.innerHTML += `
+                    <div class="card">
+                        <img src="${imageUrl}" alt="${name}">
+                        <p>${name}</p>
+                    </div>
+                `;
+                addToObtainedCards(randomCard, isShiny);
+
+                // 色違いポケモンが出たら通知
+                if (isShiny) {
+                    showShinyNotification(); // 通知の表示
+                    alert(`${randomCard.name}が色違いで出ました！`); // 色違いが出たときにアラートを表示
+                }
+            }
+            gachaCount += times;
+            document.getElementById("gachaCount").textContent = `ガチャ回数: ${gachaCount}`;
+            saveToLocalStorage();
+        }
+
+        // 図鑑リセット処理
+        function resetPokedex() {
+            obtainedCards = [];
+            shinyObtainedCards = [];
+            gachaCount = 0;
+            document.getElementById("gachaCount").textContent = `ガチャ回数: ${gachaCount}`;
+            displayPokedex(); // 図鑑を初期状態に更新
+            displayShinyPokedex(); // 色違い図鑑を初期状態に更新
+            displayCompletionStats(); // 完成度を初期状態に更新
+            saveToLocalStorage();
+        }
+
+        // 単発ガチャボタンのクリックイベント
+        document.getElementById("singleGacha").addEventListener("click", () => pullGacha(1));
+        // 10連ガチャボタンのクリックイベント
+        document.getElementById("multiGacha").addEventListener("click", () => pullGacha(10));
+        // 図鑑リセットボタンのクリックイベント
+        document.getElementById("resetPokedex").addEventListener("click", resetPokedex);
+
+        // 初期データ取得
+        loadFromLocalStorage();
+        fetchPokemonData();
+    </script>
+</body>
+</html>
